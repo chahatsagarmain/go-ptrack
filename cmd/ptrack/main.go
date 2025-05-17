@@ -32,22 +32,23 @@ func main() {
     			}
 				fmt.Printf("tracing process %v now !\n",pid);
 				proc := process.NewProcess(int(pid));
-				done := make(chan int);
+				done := make(chan struct{})
+
 				go func() {
-					for {
-						if len(done) > 0 {
-							return;
-						}	else{
-							fmt.Println("tracing.....");
-							proc.Mu.Lock();
-							fmt.Printf("traces generated : %d\n",len(proc.Logs))
-							proc.Mu.Unlock();
-							time.Sleep(1 * time.Second);
-						}
-					}
+				    for {
+				        select {
+				        case <-done:
+				            return
+				        default:
+				            fmt.Println("tracing.....")
+				            proc.Mu.Lock()
+				            fmt.Printf("traces generated : %d\n", len(proc.Logs))
+				            proc.Mu.Unlock()
+				            time.Sleep(5 * time.Second)
+				        }
+				    }
 				}()
 				err = controller.ControllerStart(proc.PID,1000,proc);
-				done<-1;
 				close(done);
 				if err != nil {
 					log.Fatalf("tracing stopped....");

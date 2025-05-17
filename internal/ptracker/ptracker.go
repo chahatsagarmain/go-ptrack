@@ -28,7 +28,7 @@ func GetProcPath(filename string , pid int) (string) {
 func GetStatus(pid int) (int , error){
 	procPath := fmt.Sprintf("/proc/%d", pid)
     if _, err := os.Stat(procPath); os.IsNotExist(err) {
-        return 0 , fmt.Errorf("proess not found \n");
+        return 0 , fmt.Errorf("process not found \n");
 	} 
 	return 1 , nil
 }
@@ -48,6 +48,9 @@ func GetCommandLine(pid int) (string , error){
 }
 
 func GetCwd(pid int) (string, error) {
+	if _, err := GetStatus(pid); err != nil {
+        return "", err
+    }
     cwdPath := fmt.Sprintf("/proc/%d/cwd", pid)
     target, err := os.Readlink(cwdPath)
     if err != nil {
@@ -57,6 +60,9 @@ func GetCwd(pid int) (string, error) {
 }
 
 func GetExe(pid int) (string, error) {
+	if _, err := GetStatus(pid); err != nil {
+        return "", err
+    }
     cwdPath := fmt.Sprintf("/proc/%d/exe", pid)
     target, err := os.Readlink(cwdPath)
     if err != nil {
@@ -66,6 +72,9 @@ func GetExe(pid int) (string, error) {
 }
 
 func GetIO(pid int) (string, error) {
+	if _, err := GetStatus(pid); err != nil {
+        return "", err
+    }
     cwdPath := fmt.Sprintf("/proc/%d/io", pid)
     target, err := os.ReadFile(cwdPath)
     if err != nil {
@@ -76,6 +85,9 @@ func GetIO(pid int) (string, error) {
 
 
 func GetSysCall(pid int) (string, error) {
+	if _, err := GetStatus(pid); err != nil {
+        return "", err
+    }
     cwdPath := fmt.Sprintf("/proc/%d/syscall", pid)
     target, err := os.ReadFile(cwdPath)
     if err != nil {
@@ -85,6 +97,9 @@ func GetSysCall(pid int) (string, error) {
 }
 
 func GetMem(pid int) (string, error) {
+	if _, err := GetStatus(pid); err != nil {
+        return "", err
+    }
     cwdPath := fmt.Sprintf("/proc/%d/statm", pid)
     target, err := os.ReadFile(cwdPath)
     if err != nil {
