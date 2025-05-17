@@ -6,7 +6,10 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
+	"github.com/chahatsagarmain/go-ptrack/internal/process"
+	"github.com/chahatsagarmain/go-ptrack/internal/controller"
 	"github.com/urfave/cli/v3"
 )
 
@@ -27,7 +30,29 @@ func main() {
     			    log.Fatalf("PROCESS WITH PID %d DOES NOT EXIST\n", pid)
     			    return fmt.Errorf("PROCESS WITH PID %d DOES NOT EXIST\n", pid)
     			}
-				fmt.Printf("tracing process %v now !",pid);
+				fmt.Printf("tracing process %v now !\n",pid);
+				proc := process.NewProcess(int(pid));
+				done := make(chan int);
+				go func() {
+					for {
+						if len(done) > 0 {
+							return;
+						}	else{
+							fmt.Println("tracing.....");
+							proc.Mu.Lock();
+							fmt.Printf("traces generated : %d\n",len(proc.Logs))
+							proc.Mu.Unlock();
+							time.Sleep(1 * time.Second);
+						}
+					}
+				}()
+				err = controller.ControllerStart(proc.PID,1000,proc);
+				done<-1;
+				close(done);
+				if err != nil {
+					log.Fatalf("tracing stopped....");
+					return err;
+				}
 			} else if (cmd.NArg() > 1) {
 				fmt.Printf("ENTER ONLY PID OF PROCESS TO TRACE\n");
 			} else {
