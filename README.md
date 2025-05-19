@@ -1,4 +1,5 @@
 # go-ptrack
+![Dancing Gopher](http://static.velvetcache.org/pages/2018/06/13/party-gopher/dancing-gopher.gif)                                         ![Party Gopher](http://static.velvetcache.org/pages/2018/06/13/party-gopher/party-gopher.gif)
 
 **go-ptrack** is a lightweight,Highly concurrent , extensible process tracker and logger for Linux, written in Go.  
 It allows you to trace a running process by its PID, periodically collect detailed runtime information from `/proc/<pid>`, and save the trace logs as JSON for further analysis even as a time based data.
