@@ -6,142 +6,103 @@ import (
 
 	"github.com/chahatsagarmain/go-ptrack/internal/process"
 	"github.com/chahatsagarmain/go-ptrack/internal/ptracker"
-	"golang.org/x/sync/errgroup"
 )
 
 func ControllerStart(pid int, _ int, p *process.Process) error {
-	for {
-		t := time.Now().Truncate(time.Second)
-		fmt.Printf("\n=== Trace at %v ===\n", t)
+    for {
+        t := time.Now().Truncate(time.Second)
+        fmt.Printf("\n=== Trace at %v ===\n", t)
 
-		p.Mu.Lock()
-		p.Logs[t] = process.ProcessInfo{PID: pid}
-		p.Mu.Unlock()
+        // Create a single goroutine to collect all data
+        done := make(chan error, 1)
+        
+        go func() {
+            // Initialize process info
+            info := process.ProcessInfo{PID: pid}
+            
+            // Collect all data sequentially in one goroutine
+            // Status
+            if resInt, err := ptracker.GetStatus(pid); err == nil && resInt != 0 {
+                info.Status = resInt
+            } else if err != nil {
+                done <- fmt.Errorf("status error: %v", err)
+                return
+            }
 
-		g := new(errgroup.Group)
+            // CommandLine
+            if res, err := ptracker.GetCommandLine(pid); err == nil {
+                info.Cmdline = res
+            } else {
+                done <- fmt.Errorf("cmdline error: %v", err)
+                return
+            }
 
-		// Status
-		g.Go(func() error {
-			resInt, err := ptracker.GetStatus(pid)
-			if err != nil || resInt == 0 {
-				return fmt.Errorf("status 0 for process: %v", err)
-			}
-			p.Mu.Lock()
-			info := p.Logs[t]
-			info.Status = resInt
-			p.Logs[t] = info
-			p.Mu.Unlock()
-			return nil
-		})
+            // CWD
+            if res, err := ptracker.GetCwd(pid); err == nil {
+                info.CWD = res
+            } else {
+                done <- fmt.Errorf("cwd error: %v", err)
+                return
+            }
 
-		// CommandLine
-		g.Go(func() error {
-			res, err := ptracker.GetCommandLine(pid)
-			if err != nil {
-				return err
-			}
-			p.Mu.Lock()
-			info := p.Logs[t]
-			info.Cmdline = res
-			p.Logs[t] = info
-			p.Mu.Unlock()
-			return nil
-		})
+            // EXE
+            if res, err := ptracker.GetExe(pid); err == nil {
+                info.EXE = res
+            } else {
+                done <- fmt.Errorf("exe error: %v", err)
+                return
+            }
 
-		// CWD
-		g.Go(func() error {
-			res, err := ptracker.GetCwd(pid)
-			if err != nil {
-				return err
-			}
-			p.Mu.Lock()
-			info := p.Logs[t]
-			info.CWD = res
-			p.Logs[t] = info
-			p.Mu.Unlock()
-			return nil
-		})
+            // IO
+            if res, err := ptracker.GetIO(pid); err == nil {
+                info.IO = res
+            } else {
+                done <- fmt.Errorf("io error: %v", err)
+                return
+            }
 
-		// EXE
-		g.Go(func() error {
-			res, err := ptracker.GetExe(pid)
-			if err != nil {
-				return err
-			}
-			p.Mu.Lock()
-			info := p.Logs[t]
-			info.EXE = res
-			p.Logs[t] = info
-			p.Mu.Unlock()
-			return nil
-		})
+            // SysCall
+            if res, err := ptracker.GetSysCall(pid); err == nil {
+                info.SYSCALL = res
+            } else {
+                done <- fmt.Errorf("syscall error: %v", err)
+                return
+            }
 
-		// IO
-		g.Go(func() error {
-			res, err := ptracker.GetIO(pid)
-			if err != nil {
-				return err
-			}
-			p.Mu.Lock()
-			info := p.Logs[t]
-			info.IO = res
-			p.Logs[t] = info
-			p.Mu.Unlock()
-			return nil
-		})
+            // Mem
+            if res, err := ptracker.GetMem(pid); err == nil {
+                info.MEM = res
+            } else {
+                done <- fmt.Errorf("mem error: %v", err)
+                return
+            }
 
-		// SysCall
-		g.Go(func() error {
-			res, err := ptracker.GetSysCall(pid)
-			if err != nil {
-				return err
-			}
-			p.Mu.Lock()
-			info := p.Logs[t]
-			info.SYSCALL = res
-			p.Logs[t] = info
-			p.Mu.Unlock()
-			return nil
-		})
+            // FD
+            if res, resInt, err := ptracker.GetFD(pid); err == nil {
+                info.FD = resInt
+                info.FDmp = res
+            } else {
+                done <- fmt.Errorf("fd error: %v", err)
+                return
+            }
 
-		// Mem
-		g.Go(func() error {
-			res, err := ptracker.GetMem(pid)
-			if err != nil {
-				return err
-			}
-			p.Mu.Lock()
-			info := p.Logs[t]
-			info.MEM = res
-			p.Logs[t] = info
-			p.Mu.Unlock()
-			return nil
-		})
+            // Single lock operation to store all data
+            p.Mu.Lock()
+            p.Logs[t] = info
+            p.Mu.Unlock()
 
-        g.Go(func() error {
-			res, resInt , err := ptracker.GetFD(pid)
-			if err != nil {
-				return err
-			}
-			p.Mu.Lock()
-			info := p.Logs[t]
-            info.FD = resInt
-			info.FDmp = res
-			p.Logs[t] = info
-			p.Mu.Unlock()
-			return nil
-		})
+            done <- nil
+        }()
 
-		// Wait for all goroutines and handle error
-		if err := g.Wait(); err != nil {
-			fmt.Printf("process monitoring error: %v\n", err)
-			return err
-		}
+        // Wait for completion
+        if err := <-done; err != nil {
+            fmt.Printf("process monitoring error: %v\n", err)
+            return err
+        }
 
-		p.Mu.Lock()
-		fmt.Printf("=== Completed trace %d at %v ===\n", len(p.Logs), t)
-		p.Mu.Unlock()
+        fmt.Printf("=== Completed trace %d at %v ===\n", len(p.Logs), t)
 
-		time.Sleep(time.Second)
-	}
+        // Add timing control
+        // time.Sleep(1 * time.Second)
+    }
 }
